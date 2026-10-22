@@ -4,9 +4,6 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer = require('multer');
 
 dotenv.config();
 
@@ -22,23 +19,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('Connected to MongoDB Database successfully'))
 .catch(err => console.error('Database Connection Error:', err));
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Set up storage engine for multer to use Cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'rentspace-listings',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-  }
-});
-const upload = multer({ storage: storage });
-
 // Models
 const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
@@ -51,7 +31,7 @@ const listingSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   description: String,
   location: { type: String, required: true },
-  images: [String], // Array of Cloudinary image URLs
+  image: String, // Single image URL string
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now }
 });
@@ -107,18 +87,16 @@ app.get('/api/listings', async (req, res) => {
   }
 });
 
-// Create listing with up to 5 images uploaded to Cloudinary
-app.post('/api/listings', verifyToken, upload.array('images', 5), async (req, res) => {
+app.post('/api/listings', verifyToken, async (req, res) => {
   try {
-    const { title, price, description, location } = req.body;
-    const imageUrls = req.files ? req.files.map(file => file.path) : [];
+    const { title, price, description, location, image } = req.body;
 
     const newListing = new Listing({
       title,
       price,
       description,
       location,
-      images: imageUrls,
+      image,
       owner: req.user.id
     });
 
