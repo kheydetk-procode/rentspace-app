@@ -3,224 +3,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RentSpace - Room Rental Marketplace</title>
-  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <title>RentSpace - Room Rental App</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; }
+    h1, h2 { color: #333; }
+    .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    input, textarea, button { display: block; width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #0056b3; }
+    .listing-grid { display: grid; gap: 15px; }
+    .listing-card { background: white; padding: 15px; border-radius: 6px; border: 1px solid #ddd; }
+    
+    /* Gallery Styles */
+    .listing-gallery { display: flex; gap: 8px; overflow-x: auto; margin-top: 10px; }
+    .gallery-thumb { width: 90px; height: 70px; object-fit: cover; border-radius: 6px; cursor: pointer; transition: transform 0.2s; }
+    .gallery-thumb:hover { transform: scale(1.05); }
+
+    /* Lightbox Modal */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
+    .modal-content { max-width: 85%; max-height: 85%; border-radius: 8px; }
+    .close { position: absolute; top: 20px; right: 35px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
+    
+    #user-info { margin-bottom: 15px; font-weight: bold; color: #555; }
+    .hidden { display: none; }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 min-h-screen">
-  <div id="app">
-    <!-- Navigation Bar -->
-    <nav class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
-      <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-        <div class="flex items-center space-x-2 cursor-pointer" @click="currentTab = 'home'">
-          <i class="fa-solid fa-house-user text-2xl text-indigo-200"></i>
-          <span class="text-xl font-bold">RentSpace</span>
-        </div>
-        <div class="flex items-center space-x-4">
-          <button @click="currentTab = 'home'" :class="{'underline font-semibold': currentTab === 'home'}" class="hover:text-indigo-200">Home</button>
-          <template v-if="currentUser">
-            <button @click="currentTab = 'myListings'" :class="{'underline font-semibold': currentTab === 'myListings'}" class="hover:text-indigo-200">My Posts</button>
-            <button @click="openPostModal" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1 shadow">
-              <i class="fa-solid fa-plus"></i> Post Room
-            </button>
-            <div class="flex items-center space-x-2 bg-indigo-700 px-3 py-1 rounded-full text-xs">
-              <i class="fa-solid fa-circle-user text-base"></i>
-              <span>{{ currentUser.name }}</span>
-              <button @click="logout" class="ml-2 text-indigo-300 hover:text-white" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
-            </div>
-          </template>
-          <template v-else>
-            <button @click="authMode = 'login'; showAuthModal = true" class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-50">Login / Register</button>
-          </template>
-        </div>
-      </div>
-    </nav>
+<body>
 
-    <!-- Main Content Area -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Search & Filters -->
-      <div v-if="currentTab === 'home'" class="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-wrap gap-4 items-center">
-        <input v-model="filters.query" @input="fetchListings" type="text" placeholder="Search title or location..." class="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <select v-model="filters.propertyType" @change="fetchListings" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">All Types</option>
-          <option value="Single Room">Single Room</option>
-          <option value="Master Bedroom">Master Bedroom</option>
-          <option value="Studio Apartment">Studio Apartment</option>
-        </select>
-        <div class="flex items-center space-x-2 text-sm">
-          <span>Max Price: ${{ filters.maxPrice }}</span>
-          <input v-model="filters.maxPrice" @change="fetchListings" type="range" min="100" max="2000" step="50" class="accent-indigo-600">
-        </div>
-      </div>
+  <h1>RentSpace</h1>
+  <div id="user-info"></div>
 
-      <!-- Listings Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="item in listings" :key="item._id" class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition border border-gray-100 flex flex-col">
-          <img :src="item.image" class="h-48 w-full object-cover">
-          <div class="p-4 flex-1 flex flex-col justify-between">
-            <div>
-              <div class="flex justify-between items-start">
-                <h3 class="font-bold text-lg text-gray-800">{{ item.title }}</h3>
-                <span :class="item.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-0.5 text-xs font-semibold rounded-full uppercase">{{ item.status }}</span>
-              </div>
-              <p class="text-indigo-600 font-bold text-xl my-1">${{ item.price }} <span class="text-xs text-gray-500 font-normal">/ month</span></p>
-              <p class="text-gray-500 text-xs mb-3"><i class="fa-solid fa-location-dot mr-1"></i> {{ item.location }}</p>
-              <p class="text-gray-600 text-sm line-clamp-2">{{ item.description }}</p>
-            </div>
-            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
-              <span>By: {{ item.owner?.name || 'Owner' }}</span>
-              <template v-if="currentUser && currentUser.id === item.owner?.userId">
-                <div class="space-x-2">
-                  <button @click="toggleStatus(item._id)" class="text-indigo-600 hover:underline">Toggle Status</button>
-                  <button @click="deleteListing(item._id)" class="text-red-500 hover:underline">Delete</button>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+  <!-- Authentication Section -->
+  <div class="card" id="auth-container">
+    <h2>Login / Register</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="register()" style="background: #28a745;">Register</button>
+  </div>
 
-    <!-- Post Modal -->
-    <div v-if="showPostModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-xl max-w-lg w-full p-6 space-y-4">
-        <h2 class="text-xl font-bold">Post a Room Listing</h2>
-        <form @submit.prevent="submitPost" class="space-y-3">
-          <input v-model="postForm.title" required placeholder="Title" class="w-full border rounded p-2 text-sm">
-          <div class="grid grid-cols-2 gap-2">
-            <input v-model.number="postForm.price" required type="number" placeholder="Price ($/month)" class="border rounded p-2 text-sm">
-            <select v-model="postForm.propertyType" required class="border rounded p-2 text-sm">
-              <option value="Single Room">Single Room</option>
-              <option value="Master Bedroom">Master Bedroom</option>
-              <option value="Studio Apartment">Studio Apartment</option>
-            </select>
-          </div>
-          <input v-model="postForm.location" required placeholder="Location / Address" class="w-full border rounded p-2 text-sm">
-          <input v-model="postForm.image" required placeholder="Image URL (e.g. Unsplash)" class="w-full border rounded p-2 text-sm">
-          <textarea v-model="postForm.description" required placeholder="Room description..." rows="3" class="w-full border rounded p-2 text-sm"></textarea>
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" @click="showPostModal = false" class="px-4 py-2 border rounded text-sm">Cancel</button>
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm font-semibold">Publish Post</button>
-          </div>
-        </form>
-      </div>
-    </div>
+  <!-- Post Room Section (Hidden until logged in) -->
+  <div class="card hidden" id="post-container">
+    <h2>Post a Room Rental</h2>
+    <form id="post-form">
+      <input type="text" id="title" placeholder="Room Title" required>
+      <input type="number" id="price" placeholder="Price per month ($)" required>
+      <input type="text" id="location" placeholder="Location" required>
+      <textarea id="description" placeholder="Description"></textarea>
+      
+      <label><strong>Upload Room Photos (Up to 5):</strong></label>
+      <input type="file" id="imageFiles" accept="image/*" multiple required>
 
-    <!-- Auth Modal -->
-    <div v-if="showAuthModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-xl max-w-sm w-full p-6 space-y-4">
-        <h2 class="text-xl font-bold">{{ authMode === 'login' ? 'Login' : 'Register Account' }}</h2>
-        <form @submit.prevent="handleAuth" class="space-y-3">
-          <input v-if="authMode === 'register'" v-model="authForm.name" required placeholder="Full Name" class="w-full border rounded p-2 text-sm">
-          <input v-model="authForm.email" required type="email" placeholder="Email Address" class="w-full border rounded p-2 text-sm">
-          <input v-model="authForm.password" required type="password" placeholder="Password" class="w-full border rounded p-2 text-sm">
-          <button type="submit" class="w-full py-2 bg-indigo-600 text-white rounded text-sm font-semibold">{{ authMode === 'login' ? 'Sign In' : 'Create Account' }}</button>
-        </form>
-        <p class="text-xs text-center text-gray-500">
-          <a href="#" @click.prevent="authMode = authMode === 'login' ? 'register' : 'login'" class="text-indigo-600 font-semibold underline">
-            {{ authMode === 'login' ? "Don't have an account? Register" : "Already registered? Login" }}
-          </a>
-        </p>
-      </div>
-    </div>
+      <button type="submit">Publish Listing</button>
+    </form>
+    <button onclick="logout()" style="background: #dc3545; margin-top: 10px;">Logout</button>
+  </div>
+
+  <!-- Listings Feed -->
+  <div class="card">
+    <h2>Available Rooms</h2>
+    <div id="listings-container" class="listing-grid">Loading listings...</div>
+  </div>
+
+  <!-- Image Preview Modal -->
+  <div id="imageModal" class="modal" onclick="closeModal()">
+    <span class="close">&times;</span>
+    <img class="modal-content" id="previewImg">
   </div>
 
   <script>
-    const { createApp, ref, onMounted } = Vue;
+    const token = localStorage.getItem('token');
+    const userEmail = localStorage.getItem('email');
 
-    createApp({
-      setup() {
-        const currentTab = ref('home');
-        const listings = ref([]);
-        const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
-        const token = ref(localStorage.getItem('token') || '');
+    if (token) {
+      document.getElementById('auth-container').classList.add('hidden');
+      document.getElementById('post-container').classList.remove('hidden');
+      document.getElementById('user-info').innerText = `Logged in as: ${userEmail}`;
+    }
 
-        const showPostModal = ref(false);
-        const showAuthModal = ref(false);
-        const authMode = ref('login');
+    async function register() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+    }
 
-        const filters = ref({ query: '', propertyType: '', maxPrice: 2000 });
-        const postForm = ref({ title: '', price: 350, propertyType: 'Single Room', location: '', image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600', description: '' });
-        const authForm = ref({ name: '', email: '', password: '' });
-
-        const fetchListings = async () => {
-          let url = `/api/listings?query=${filters.value.query}&propertyType=${filters.value.propertyType}&maxPrice=${filters.value.maxPrice}`;
-          if (currentTab.value === 'myListings' && currentUser.value) {
-            url += `&ownerId=${currentUser.value.id}`;
-          }
-          const res = await fetch(url);
-          listings.value = await res.json();
-        };
-
-        const openPostModal = () => {
-          if (!currentUser.value) { showAuthModal.value = true; return; }
-          showPostModal.value = true;
-        };
-
-        const submitPost = async () => {
-          const res = await fetch('/api/listings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token.value}` },
-            body: JSON.stringify(postForm.value)
-          });
-          if (res.ok) {
-            showPostModal.value = false;
-            fetchListings();
-          }
-        };
-
-        const handleAuth = async () => {
-          const endpoint = authMode.value === 'login' ? '/api/auth/login' : '/api/auth/register';
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(authForm.value)
-          });
-          const data = await res.json();
-          if (res.ok) {
-            token.value = data.token;
-            currentUser.value = data.user;
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            showAuthModal.value = false;
-            fetchListings();
-          } else {
-            alert(data.message);
-          }
-        };
-
-        const toggleStatus = async (id) => {
-          await fetch(`/api/listings/${id}/status`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${token.value}` }
-          });
-          fetchListings();
-        };
-
-        const deleteListing = async (id) => {
-          if (!confirm('Delete this post?')) return;
-          await fetch(`/api/listings/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token.value}` }
-          });
-          fetchListings();
-        };
-
-        const logout = () => {
-          currentUser.value = null;
-          token.value = '';
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          currentTab.value = 'home';
-          fetchListings();
-        };
-
-        onMounted(fetchListings);
-
-        return { currentTab, listings, currentUser, showPostModal, showAuthModal, authMode, filters, postForm, authForm, fetchListings, openPostModal, submitPost, handleAuth, toggleStatus, deleteListing, logout };
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('email', data.email);
+        location.reload();
+      } else {
+        alert(data.error);
       }
-    }).mount('#app');
+    }
+
+    function logout() {
+      localStorage.clear();
+      location.reload();
+    }
+
+    // Handle posting room with multiple pictures via FormData
+    document.getElementById('post-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData();
+      formData.append('title', document.getElementById('title').value);
+      formData.append('price', document.getElementById('price').value);
+      formData.append('location', document.getElementById('location').value);
+      formData.append('description', document.getElementById('description').value);
+
+      const files = document.getElementById('imageFiles').files;
+      for (let i = 0; i < files.length; i++) {
+        formData.append('images', files[i]);
+      }
+
+      const res = await fetch('/api/listings', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Room posted successfully!');
+        location.reload();
+      } else {
+        alert(data.error);
+      }
+    });
+
+    // Fetch and display listings
+    async function fetchListings() {
+      try {
+        const res = await fetch('/api/listings');
+        const listings = await res.json();
+        const container = document.getElementById('listings-container');
+        
+        if (listings.length === 0) {
+          container.innerHTML = '<p>No room listings available yet.</p>';
+          return;
+        }
+
+        container.innerHTML = listings.map(listing => `
+          <div class="listing-card">
+            <h3>${listing.title} - $${listing.price}/mo</h3>
+            <p><strong>Location:</strong> ${listing.location}</p>
+            <p>${listing.description || 'No description provided.'}</p>
+            <div class="listing-gallery">
+              ${listing.images && listing.images.length > 0 
+                ? listing.images.map(img => `<img src="${img}" class="gallery-thumb" onclick="openModal('${img}')" alt="Room photo">`).join('') 
+                : '<p style="font-size:12px; color:#888;">No photos uploaded</p>'}
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('listings-container').innerHTML = '<p>Failed to load listings.</p>';
+      }
+    }
+
+    // Modal Controls
+    function openModal(imgUrl) {
+      document.getElementById('previewImg').src = imgUrl;
+      document.getElementById('imageModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('imageModal').style.display = 'none';
+    }
+
+    fetchListings();
   </script>
 </body>
 </html>
