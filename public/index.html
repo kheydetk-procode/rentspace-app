@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentSpace - Room Rental Marketplace</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+  <div id="app">
+    <!-- Navigation Bar -->
+    <nav class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-2 cursor-pointer" @click="currentTab = 'home'">
+          <i class="fa-solid fa-house-user text-2xl text-indigo-200"></i>
+          <span class="text-xl font-bold">RentSpace</span>
+        </div>
+        <div class="flex items-center space-x-4">
+          <button @click="currentTab = 'home'" :class="{'underline font-semibold': currentTab === 'home'}" class="hover:text-indigo-200">Home</button>
+          <template v-if="currentUser">
+            <button @click="currentTab = 'myListings'" :class="{'underline font-semibold': currentTab === 'myListings'}" class="hover:text-indigo-200">My Posts</button>
+            <button @click="openPostModal" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1 shadow">
+              <i class="fa-solid fa-plus"></i> Post Room
+            </button>
+            <div class="flex items-center space-x-2 bg-indigo-700 px-3 py-1 rounded-full text-xs">
+              <i class="fa-solid fa-circle-user text-base"></i>
+              <span>{{ currentUser.name }}</span>
+              <button @click="logout" class="ml-2 text-indigo-300 hover:text-white" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+          </template>
+          <template v-else>
+            <button @click="authMode = 'login'; showAuthModal = true" class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-50">Login / Register</button>
+          </template>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+      <!-- Search & Filters -->
+      <div v-if="currentTab === 'home'" class="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-wrap gap-4 items-center">
+        <input v-model="filters.query" @input="fetchListings" type="text" placeholder="Search title or location..." class="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <select v-model="filters.propertyType" @change="fetchListings" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">All Types</option>
+          <option value="Single Room">Single Room</option>
+          <option value="Master Bedroom">Master Bedroom</option>
+          <option value="Studio Apartment">Studio Apartment</option>
+        </select>
+        <div class="flex items-center space-x-2 text-sm">
+          <span>Max Price: ${{ filters.maxPrice }}</span>
+          <input v-model="filters.maxPrice" @change="fetchListings" type="range" min="100" max="2000" step="50" class="accent-indigo-600">
+        </div>
+      </div>
+
+      <!-- Listings Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-for="item in listings" :key="item._id" class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition border border-gray-100 flex flex-col">
+          <img :src="item.image" class="h-48 w-full object-cover">
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start">
+                <h3 class="font-bold text-lg text-gray-800">{{ item.title }}</h3>
+                <span :class="item.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-2 py-0.5 text-xs font-semibold rounded-full uppercase">{{ item.status }}</span>
+              </div>
+              <p class="text-indigo-600 font-bold text-xl my-1">${{ item.price }} <span class="text-xs text-gray-500 font-normal">/ month</span></p>
+              <p class="text-gray-500 text-xs mb-3"><i class="fa-solid fa-location-dot mr-1"></i> {{ item.location }}</p>
+              <p class="text-gray-600 text-sm line-clamp-2">{{ item.description }}</p>
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+              <span>By: {{ item.owner?.name || 'Owner' }}</span>
+              <template v-if="currentUser && currentUser.id === item.owner?.userId">
+                <div class="space-x-2">
+                  <button @click="toggleStatus(item._id)" class="text-indigo-600 hover:underline">Toggle Status</button>
+                  <button @click="deleteListing(item._id)" class="text-red-500 hover:underline">Delete</button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Post Modal -->
+    <div v-if="showPostModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-xl max-w-lg w-full p-6 space-y-4">
+        <h2 class="text-xl font-bold">Post a Room Listing</h2>
+        <form @submit.prevent="submitPost" class="space-y-3">
+          <input v-model="postForm.title" required placeholder="Title" class="w-full border rounded p-2 text-sm">
+          <div class="grid grid-cols-2 gap-2">
+            <input v-model.number="postForm.price" required type="number" placeholder="Price ($/month)" class="border rounded p-2 text-sm">
+            <select v-model="postForm.propertyType" required class="border rounded p-2 text-sm">
+              <option value="Single Room">Single Room</option>
+              <option value="Master Bedroom">Master Bedroom</option>
+              <option value="Studio Apartment">Studio Apartment</option>
+            </select>
+          </div>
+          <input v-model="postForm.location" required placeholder="Location / Address" class="w-full border rounded p-2 text-sm">
+          <input v-model="postForm.image" required placeholder="Image URL (e.g. Unsplash)" class="w-full border rounded p-2 text-sm">
+          <textarea v-model="postForm.description" required placeholder="Room description..." rows="3" class="w-full border rounded p-2 text-sm"></textarea>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" @click="showPostModal = false" class="px-4 py-2 border rounded text-sm">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm font-semibold">Publish Post</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div v-if="showAuthModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-xl max-w-sm w-full p-6 space-y-4">
+        <h2 class="text-xl font-bold">{{ authMode === 'login' ? 'Login' : 'Register Account' }}</h2>
+        <form @submit.prevent="handleAuth" class="space-y-3">
+          <input v-if="authMode === 'register'" v-model="authForm.name" required placeholder="Full Name" class="w-full border rounded p-2 text-sm">
+          <input v-model="authForm.email" required type="email" placeholder="Email Address" class="w-full border rounded p-2 text-sm">
+          <input v-model="authForm.password" required type="password" placeholder="Password" class="w-full border rounded p-2 text-sm">
+          <button type="submit" class="w-full py-2 bg-indigo-600 text-white rounded text-sm font-semibold">{{ authMode === 'login' ? 'Sign In' : 'Create Account' }}</button>
+        </form>
+        <p class="text-xs text-center text-gray-500">
+          <a href="#" @click.prevent="authMode = authMode === 'login' ? 'register' : 'login'" class="text-indigo-600 font-semibold underline">
+            {{ authMode === 'login' ? "Don't have an account? Register" : "Already registered? Login" }}
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const currentTab = ref('home');
+        const listings = ref([]);
+        const currentUser = ref(JSON.parse(localStorage.getItem('user')) || null);
+        const token = ref(localStorage.getItem('token') || '');
+
+        const showPostModal = ref(false);
+        const showAuthModal = ref(false);
+        const authMode = ref('login');
+
+        const filters = ref({ query: '', propertyType: '', maxPrice: 2000 });
+        const postForm = ref({ title: '', price: 350, propertyType: 'Single Room', location: '', image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600', description: '' });
+        const authForm = ref({ name: '', email: '', password: '' });
+
+        const fetchListings = async () => {
+          let url = `/api/listings?query=${filters.value.query}&propertyType=${filters.value.propertyType}&maxPrice=${filters.value.maxPrice}`;
+          if (currentTab.value === 'myListings' && currentUser.value) {
+            url += `&ownerId=${currentUser.value.id}`;
+          }
+          const res = await fetch(url);
+          listings.value = await res.json();
+        };
+
+        const openPostModal = () => {
+          if (!currentUser.value) { showAuthModal.value = true; return; }
+          showPostModal.value = true;
+        };
+
+        const submitPost = async () => {
+          const res = await fetch('/api/listings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token.value}` },
+            body: JSON.stringify(postForm.value)
+          });
+          if (res.ok) {
+            showPostModal.value = false;
+            fetchListings();
+          }
+        };
+
+        const handleAuth = async () => {
+          const endpoint = authMode.value === 'login' ? '/api/auth/login' : '/api/auth/register';
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(authForm.value)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            token.value = data.token;
+            currentUser.value = data.user;
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            showAuthModal.value = false;
+            fetchListings();
+          } else {
+            alert(data.message);
+          }
+        };
+
+        const toggleStatus = async (id) => {
+          await fetch(`/api/listings/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token.value}` }
+          });
+          fetchListings();
+        };
+
+        const deleteListing = async (id) => {
+          if (!confirm('Delete this post?')) return;
+          await fetch(`/api/listings/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token.value}` }
+          });
+          fetchListings();
+        };
+
+        const logout = () => {
+          currentUser.value = null;
+          token.value = '';
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          currentTab.value = 'home';
+          fetchListings();
+        };
+
+        onMounted(fetchListings);
+
+        return { currentTab, listings, currentUser, showPostModal, showAuthModal, authMode, filters, postForm, authForm, fetchListings, openPostModal, submitPost, handleAuth, toggleStatus, deleteListing, logout };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
